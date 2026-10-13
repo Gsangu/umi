@@ -99,7 +99,11 @@ export const qiankun = {
 
 假设您的子应用项目**基于 Umi 开发**且**引入了 `qiankun` [插件](https://github.com/umijs/umi/blob/master/packages/plugins/src/qiankun.ts)**。如果没有，可以按照[此教程](https://qiankun.umijs.org/zh/guide/getting-started#%E5%BE%AE%E5%BA%94%E7%94%A8)进行配置。
 
-修改子应用的 Umi 的配置文件，添加如下内容：
+:::warning{title="Utoopack 兼容性"}
+如果子应用使用 utoopack 构建，且主应用使用 qiankun 2，请将主应用的 qiankun 升级至 `2.10.17-beta.0` 或更高版本。更早的版本无法在执行入口脚本时正确提供 `document.currentScript`，会导致子应用加载失败。更多适配原理请参阅 Utoo 官网博客[《当 Turbopack 遇上 qiankun：Utoopack 的微前端适配实践》](https://utoo.land/zh/docs/blog/utoopack-qiankun)。
+:::
+
+修改子应用的 Umi 配置文件，添加如下内容：
 
 ```ts
 // .umirc.ts
@@ -426,7 +430,7 @@ function MyPage(props) {
 export default connectMaster(MyPage);
 ```
 
-子应用也可以在生命周期钩子中能够获取并消费得到的 `props` 属性，根据需求[实现对应的生命周期钩子](#子应用配置生命周期钩子)即可。
+子应用也可以在生命周期钩子中获取并使用传入的 `props` 属性，根据需求[实现对应的生命周期钩子](#子应用配置生命周期钩子)即可。
 
 特别的，当父应用使用 `<MicroApp />` 或 `<MicroAppWithMemoHistory />` 组件的方式引入子应用时，会额外向子应用传递一个 `setLoading()` 方法，允许子应用在合适的时机执行，标记子应用加载为完成状态：
 
@@ -466,7 +470,7 @@ export const qiankun = {
 };
 ```
 
-子应用在生命周期钩子中能够获取并消费得到的 `props` 属性，根据需求[实现对应的生命周期钩子](#子应用配置生命周期钩子)即可。
+子应用可以在生命周期钩子中获取并使用传入的 `props` 属性，根据需求[实现对应的生命周期钩子](#子应用配置生命周期钩子)即可。
 
 ## 自定义子应用
 
@@ -684,6 +688,112 @@ export default function (error: Error) {
 
 注意：`errorBoundary` 的优先级高于 `defaultErrorBoundary`。
 
+## 子应用缓存 keepAlive
+
+开启后，主应用通过路由绑定的微应用在切换离开时会保留缓存（基于 [`react-activation`](https://github.com/CJY0208/react-activation)），再次进入可恢复状态。
+
+默认关闭。插件只负责在开启时用 `KeepAlive` 包装微应用路由；**`AliveScope` 需由业务在根节点自行挂载**，以便统一管理缓存生命周期。
+
+完整示例：[`examples/qiankun-keepalive`](https://github.com/umijs/umi/tree/master/examples/qiankun-keepalive)（主应用 + `app1` / `app2` 子应用、页签栏、子应用路由 `wrappers`）。
+
+### 配置
+
+```ts
+// 主应用 .umirc.ts
+export default {
+  plugins: ['umi-plugin-keep-alive'],
+  qiankun: {
+    keepAlive: true,
+    master: {
+      apps: [
+        {
+          // 必须与子应用 package.json 的 name、路由 microApp 一致
+          name: 'app1',
+          entry: '//localhost:7001',
+          // 建议与路由 path 前缀一致，供运行时注入子应用 history.basename
+          base: '/app1',
+        },
+      ],
+    },
+  },
+  routes: [
+    { path: '/app1/*', microApp: 'app1' },
+  ],
+};
+```
+
+```ts
+// 子应用 package.json
+{ "name": "app1" }
+
+// 子应用 .umirc.ts
+const { name } = require('./package.json');
+const isProd = process.env.NODE_ENV === 'production';
+
+export default {
+  plugins: ['umi-plugin-keep-alive'],
+  qiankun: { slave: {} },
+  // 生产环境资源/路由挂在 /${name}/；开发环境由主应用注入 base
+  base: isProd ? `/${name}/` : '/',
+  publicPath: isProd ? `/${name}/` : '/',
+  routes: [
+    // 每个页面路由单独包 KeepAlive（umi wrappers 会变成父路由，内部用 Outlet 渲染页面）
+    { path: '/', component: 'index', wrappers: ['@/keepAlive/index'] },
+    { path: '/about', component: 'about', wrappers: ['@/keepAlive/index'] },
+  ],
+};
+```
+
+### 挂载 AliveScope
+
+推荐使用 [`umi-plugin-keep-alive`](https://github.com/alitajs/umi-plugin-keep-alive)（公开版可用 `0.0.1-beta.34`，依赖 `react-activation@^0.13.4`）：插件会挂载 `AliveScope`，并从 `umi` / `@umijs/max` 导出 `KeepAlive`、`useAliveController`。
+
+也可在 `app.tsx` 用 `rootContainer` 自行包裹 `AliveScope`。**主应用与子应用都需要 AliveScope**（各自安装插件或自行挂载）。
+
+### 两层缓存
+
+| 层级 | 缓存名 | 作用 |
+| --- | --- | --- |
+| 主应用插件 | `` `qiankun_/${appName}/` `` | 缓存整个微应用树（切换子应用时保留状态） |
+| 主应用页签 | `location.pathname`（如 `/app1/about`） | 空 `KeepAlive` 仅占页签；真实微应用内容渲染在外侧 |
+| 子应用 wrappers | 子应用内的 `location.pathname` | 缓存子应用各个页面 |
+
+页签栏应展示**非** `qiankun_` 前缀的缓存；`qiankun_*` 只负责挂住微应用实例。子应用清空自身页面缓存后，可调用 `window.closeKeepAliveTab?.('qiankun_/app1/')` 通知主应用卸载对应微应用树。
+
+### 缓存清理
+
+```ts
+import { useAliveController } from '@umijs/max';
+
+const { dropScope } = useAliveController();
+dropScope('qiankun_/app1/');
+// 或：window.closeKeepAliveTab?.('qiankun_/app1/');
+```
+
+### 注意事项（常见坑）
+
+:::warning{title=务必注意}
+1. **`package.json` 的 `name` 必须与 `qiankun.master.apps[].name`、路由 `microApp` 一致**（示例为 `app1` / `app2`）。缓存键为 `` `qiankun_/${name}/` ``，不一致会导致关页签、清理缓存对不上。
+2. **主应用 `apps[].base` 与路由前缀对齐**（如 `base: '/app1'` 对应 `path: '/app1/*'`），运行时会注入子应用 `history.basename`。
+3. **子应用 `base` / `publicPath` 区分环境**：生产用 `` `/${name}/` ``；开发一般用 `'/'`，由主应用注入 basename。
+4. **React 18 必须关闭 `autoFreeze`**。开启 freeze 后，缓存回来的微应用里输入框/下拉等往往无法恢复或不可交互。插件生成的微应用 `KeepAlive` 已设 `autoFreeze={false}`；业务侧其它 `KeepAlive` 也要关闭，例如：
+
+```ts
+// 主/子应用 app.tsx
+import { KeepAlive } from 'react-activation';
+
+KeepAlive.defaultProps = {
+  ...(KeepAlive.defaultProps || {}),
+  autoFreeze: false,
+};
+```
+
+5. **`KeepAlive` 与 `AliveScope` 必须是同一份 `react-activation` 实例**。主应用需安装 `react-activation`（或通过 `umi-plugin-keep-alive` 引入）；若 KeepAlive 从插件绝对路径导入、AliveScope 从另一份包导入，缓存不会生效，切换后状态会丢。
+6. **子应用路由用 `wrappers` 包每一页**，wrapper 内用 `<Outlet />` 渲染页面（不要只用 `props.children`，umi 的 wrapper 会变成 `isWrapper` 父路由，否则页面空白）。
+7. **主应用页签**：在微应用路由上用「空 `KeepAlive` + `name={location.pathname}`」占位出 Tab，真实 `<Outlet />`（微应用）放在 KeepAlive 外面，才能既出 `/app1/about` 这类页签，又不挡主应用 Provider。
+8. **`keepAlive` 仅作用于路由绑定的 `microApp`**。`<MicroApp />` / `<MicroAppWithMemoHistory />` 需自行包 `KeepAlive`。
+:::
+
 ## 环境变量
 
 如果您有一些不能显式编写在 `.umirc.ts` 或 `src/app.ts` 中的配置信息，可以将它们存放在环境变量文件中。例如编写父应用的环境变量文件 `.env` 如下：
@@ -736,6 +846,15 @@ export default {
 ```
 
 ## API
+
+### QiankunOptions
+
+| 属性 | 必填 | 说明 | 类型 | 默认值 |
+| --- | --- | --- | --- | --- |
+| `master` | 否 | 父应用配置 | [`MasterOptions`](#masteroptions) | `undefined` |
+| `slave` | 否 | 子应用配置 | [`SlaveOptions`](#slaveoptions) | `undefined` |
+| `keepAlive` | 否 | 是否缓存路由绑定的微应用，详见 [子应用缓存 keepAlive](#子应用缓存-keepalive) | `boolean` | `false` |
+| `externalQiankun` | 否 | 是否使用外部 qiankun 依赖 | `boolean` | `false` |
 
 ### MasterOptions
 

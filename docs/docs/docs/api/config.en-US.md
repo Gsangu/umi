@@ -178,7 +178,7 @@ export default {
 
 When this feature is enabled, you can jump to the source code location in the editor by `Option+Click/Alt+Click` on the component. `Option+Right-click/Alt+Right-click` opens the context to view the parent component.
 
-About parameters. The `editor` parameter defaults to 'vscode', supporting `vscode` & `vscode-insiders`.
+About parameters. The `editor` parameter defaults to 'vscode', supporting `vscode`, `vscode-insiders` and `cursor`.
 
 Configure the behavior of clickToComponent, for more details see [click-to-component](https://github.com/ericclemmons/click-to-component).
 
@@ -691,23 +691,30 @@ favicons: [
 ]
 ```
 
-## forget
+## reactCompiler
 
-- Type: `{ ReactCompilerConfig: object }`
+- Type: `boolean | object`
 - Default: `null`
 
-Whether to enable React Compiler (React Forget) functionality. Reference https://react.dev/learn/react-compiler.
+Whether to enable React Compiler through `babel-plugin-react-compiler`. Reference https://react.dev/learn/react-compiler.
 
 ```ts
-forget: {
-  ReactCompilerConfig: {},
+reactCompiler: true,
+```
+
+React Compiler options are passed directly to `babel-plugin-react-compiler`:
+
+```ts
+reactCompiler: {
+  target: '19',
 },
 ```
 
 Note:
 
-1. forget is currently incompatible with mfsu and mako. If forget is enabled while mfsu or mako is on, an error will be thrown.
-2. forget requires react 19. When using it, please manually install react@rc and react-dom@rc as project dependencies.
+- reactCompiler is currently incompatible with mfsu and mako. If they are enabled together, an error will be thrown; utoopack passes the React Compiler plugin config through babel-loader. To use the native Rust implementation in utoopack, configure [`utoopack.reactCompiler`](#utoopackreactcompiler) instead.
+- reactCompiler targets React 19 by default. Please install react@19 and react-dom@19 as project dependencies. To use React 17 or 18, configure the matching `target` and install react-compiler-runtime.
+- The old `forget` config is still accepted for compatibility, but it is deprecated. Please migrate to `reactCompiler`.
 
 ## forkTSChecker
 
@@ -1514,6 +1521,62 @@ Then install @babel/runtime to the project:
 ```bash
 $ npm install @babel/runtime --save-dev
 ```
+
+## utoopack <Badge>4.6.0+</Badge>
+
+- Type: `Object`
+- Default: `{}`
+
+Use rust bundler [utoopack](http://github.com/utooland/utoo) to improve the performance of build.
+
+This capability can be enabled through configuration, utoopack currently supports most of the framework's features.
+
+When building a qiankun child application with utoopack, if the parent application uses qiankun 2, the qiankun version must be `2.10.17-beta.0` or later. Earlier versions do not provide `document.currentScript` correctly while executing entry scripts, which prevents the child application from loading. For more details about the integration, see the Utoo blog post [When Turbopack Meets qiankun: Adapting Utoopack for Micro Frontends](https://utoo.land/en/docs/blog/utoopack-qiankun).
+
+### utoopack.reactCompiler
+
+- Type: `boolean | { compilationMode?: 'infer' | 'annotation' | 'all'; target?: '18' | '19' }`
+- Default: `false`
+
+Enable utoopack's native Rust implementation of React Compiler. It optimizes React components directly in the Rust compilation pipeline, without requiring you to install or configure `babel-plugin-react-compiler`.
+
+Add the following to `.umirc.ts` or `config/config.ts`:
+
+```ts
+export default {
+  utoopack: {
+    reactCompiler: true,
+  },
+};
+```
+
+`true` uses the defaults `compilationMode: 'infer'` and `target: '19'`, which require React 19 and React DOM 19 in your project. You can also pass an options object:
+
+```ts
+export default {
+  utoopack: {
+    reactCompiler: {
+      compilationMode: 'infer',
+      target: '19',
+    },
+  },
+};
+```
+
+The Rust implementation currently supports the following options, rather than the full set of Babel plugin options:
+
+| Option | Type | Default |
+| --- | --- | --- |
+| `compilationMode` | `'infer' \| 'annotation' \| 'all'` | `'infer'` |
+| `target` | `'18' \| '19'` | `'19'` |
+
+For React 18, set `utoopack.reactCompiler.target: '18'` and install the compatibility runtime as a production dependency:
+
+```bash
+npm install react-compiler-runtime
+```
+
+Umi's top-level [`reactCompiler`](#reactcompiler) option enables the Babel implementation. When switching to the Rust implementation, remove the top-level `reactCompiler`, the legacy `forget` option, and any manually configured `babel-plugin-react-compiler` to avoid enabling both implementations. Set `utoopack.reactCompiler: false` to disable the Rust implementation.
 
 ## verifyCommit
 

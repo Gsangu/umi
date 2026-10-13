@@ -3,6 +3,7 @@ import { getMarkup } from '@umijs/server';
 import { chalk, fsExtra, logger, rimraf, semver } from '@umijs/utils';
 import { writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
+import { generateBuildManifestFromStats } from '../features/ssr/utils';
 import type { IApi, IOnGenerateFiles } from '../types';
 import {
   measureFileSizesBeforeBuild,
@@ -31,7 +32,10 @@ COMPRESS=none umi build
 umi build --clean
 `,
     fn: async function () {
-      logger.info(chalk.cyan.bold(`Umi v${api.appData.umi.version}`));
+      const isUtoopack = api.appData.bundler === 'utoopack';
+      if (!isUtoopack) {
+        logger.info(chalk.cyan.bold(`Umi v${api.appData.umi.version}`));
+      }
 
       // clear tmp
       rimraf.sync(api.paths.absTmpPath);
@@ -152,6 +156,10 @@ umi build --clean
       });
 
       const stats = await bundler.build(opts);
+
+      if (api.config.ssr && isUtoopack) {
+        generateBuildManifestFromStats(api, stats);
+      }
 
       if (!api.config.vite && !api.config.mako) {
         // Measure files sizes before build

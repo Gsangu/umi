@@ -4,6 +4,39 @@ export type EntryAssets = {
   [key: string]: string[];
 };
 
+function getAssetName(asset: any) {
+  return typeof asset === 'string' ? asset : asset?.name;
+}
+
+export function extractEntryPointFilesFromStats(
+  stats: any,
+  entryName = 'umi',
+): string[] {
+  const statsJson = stats?.toJson ? stats.toJson() : stats || {};
+  const entrypoint = statsJson.entrypoints?.[entryName];
+  const files = new Set<string>();
+
+  for (const asset of entrypoint?.assets || []) {
+    const name = getAssetName(asset);
+    if (name) {
+      files.add(name);
+    }
+  }
+
+  for (const chunkId of entrypoint?.chunks || []) {
+    const chunk = (statsJson.chunks || []).find((item: any) => {
+      return item?.id === chunkId || item?.names?.includes?.(chunkId);
+    });
+    for (const file of chunk?.files || []) {
+      if (file) {
+        files.add(file);
+      }
+    }
+  }
+
+  return Array.from(files);
+}
+
 export function extractEntryAssets(entryPointFiles: string[]): EntryAssets {
   const assets: {
     js: string[];
@@ -54,6 +87,38 @@ export function extractEntryAssets(entryPointFiles: string[]): EntryAssets {
     // ext will contain .js or .css, because .mjs recognizes as .js
     const ext = extMatch[1] === 'mjs' ? 'js' : extMatch[1];
     assets[ext].push(entryPointPublicPath);
+  });
+
+  return assets;
+}
+
+// utoopack only need to deal css chunk file instead of js chunk.
+export function extractUtooEntryAssets(entryPointFiles: string[]): EntryAssets {
+  const assets: EntryAssets = {
+    js: [],
+    css: [],
+  };
+
+  const UMI_CSS_REG = /^umi(\..+)?\.css$/;
+  const cssPublicPathMap: Record<string, boolean> = {};
+  const cssExtensionRegexp = /\.(css)(\?|$)/;
+
+  entryPointFiles.forEach((entryPointPublicPath) => {
+    if (!cssExtensionRegexp.test(entryPointPublicPath)) {
+      return;
+    }
+
+    // umi css 在 html 默认注入，不在这里重复处理
+    if (UMI_CSS_REG.test(entryPointPublicPath)) {
+      return;
+    }
+
+    if (cssPublicPathMap[entryPointPublicPath]) {
+      return;
+    }
+
+    cssPublicPathMap[entryPointPublicPath] = true;
+    assets.css.push(entryPointPublicPath);
   });
 
   return assets;

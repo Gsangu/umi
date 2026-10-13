@@ -1,12 +1,13 @@
 {
   "name": "umi",
-  "version": "4.4.12",
+  "version": "4.7.24",
   "description": "umi",
   "homepage": "https://github.com/umijs/umi/tree/master/packages/umi#readme",
   "bugs": "https://github.com/umijs/umi/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/umijs/umi"
+    "url": "https://github.com/umijs/umi",
+    "directory": "packages/umi"
   },
   "license": "MIT",
   "main": "dist/index.js",
@@ -41,7 +42,6 @@
     "@umijs/bundler-utils": "workspace:*",
     "@umijs/bundler-webpack": "workspace:*",
     "@umijs/core": "workspace:*",
-    "@umijs/lint": "workspace:*",
     "@umijs/preset-umi": "workspace:*",
     "@umijs/renderer-react": "workspace:*",
     "@umijs/server": "workspace:*",
@@ -49,6 +49,9 @@
     "@umijs/utils": "workspace:*",
     "prettier-plugin-organize-imports": "^3.2.2",
     "prettier-plugin-packagejson": "2.4.3"
+  },
+  "devDependencies": {
+    "@umijs/lint": "workspace:*"
   },
   "engines": {
     "node": ">=14"

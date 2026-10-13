@@ -171,6 +171,22 @@ export const setMasterOptions = (newOpts) => options = ({ ...options, ...newOpts
           context: {
             dynamicRoot: false,
             hasModelPlugin: api.isPluginEnable('model'),
+            keepAlive: api.config.qiankun?.keepAlive ?? false,
+            // Resolve react-activation from the app when present so KeepAlive
+            // and AliveScope share one module; otherwise fall back to the
+            // plugin dependency path (pnpm-friendly absolute import).
+            reactActivationPath: (() => {
+              try {
+                require.resolve('react-activation/package', {
+                  paths: [api.cwd],
+                });
+                return 'react-activation';
+              } catch {
+                return winPath(
+                  dirname(require.resolve('react-activation/package')),
+                );
+              }
+            })(),
             // dynamicRoot:
             //   api.config.exportStatic && api.config.exportStatic.dynamicRoot,
           },
@@ -192,7 +208,7 @@ export const setMasterOptions = (newOpts) => options = ({ ...options, ...newOpts
               '__USE_MODEL__',
               api.isPluginEnable('model')
                 ? `import { useModel } from '@@/plugin-model'`
-                : `const useModel = null;`,
+                : `console.warn(\`[plugins/qiankun]: Seems like you're not using @umijs/plugin-model, you need to install it or some features may not work!\`);\nconst useModel = null`,
             )
             .replace(
               /from 'lodash\//g,

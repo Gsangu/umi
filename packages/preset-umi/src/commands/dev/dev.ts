@@ -14,7 +14,7 @@ import { basename, join } from 'path';
 import { Worker } from 'worker_threads';
 import { DEFAULT_HOST, DEFAULT_PORT } from '../../constants';
 import { LazySourceCodeCache } from '../../libs/folderCache/LazySourceCodeCache';
-import type { GenerateFilesFn, IApi } from '../../types';
+import type { GenerateFilesFn, IApi, ITmpGenerateWatcher } from '../../types';
 import { getProjectFileList } from '../../utils/projectFileList';
 import { createRouteMiddleware } from './createRouteMiddleware';
 import { faviconMiddleware } from './faviconMiddleware';
@@ -24,6 +24,7 @@ import { printMemoryUsage } from './printMemoryUsage';
 import {
   addUnWatch,
   createDebouncedHandler,
+  createEventFilteredHandler,
   expandCSSPaths,
   expandJSPaths,
   unwatch,
@@ -44,18 +45,6 @@ export default (api: IApi) => {
     },
   });
 
-  api.onStart(() => {
-    if (api.config?.mako) return;
-    // don't print ad in bigfish framework
-    if (process.env.BIGFISH_INFO) return;
-    // if (process.env.MAKO_AD === 'none') return;
-    // console.info(
-    //   chalk.yellow.bold(
-    //     'Mako https://makojs.dev is a new fast Rust based bundler from us, which is heavily optimized for umi and much faster than webpack. Visit https://makojs.dev/docs/getting-started#bundle-with-umi for more details if you want to give it a try.',
-    //   ),
-    // );
-  });
-
   api.registerCommand({
     name: 'dev',
     description: 'dev server for development',
@@ -66,7 +55,10 @@ umi dev
 PORT=8888 umi dev
 `,
     async fn() {
-      logger.info(chalk.cyan.bold(`Umi v${api.appData.umi.version}`));
+      const isUtoopack = api.appData.bundler === 'utoopack';
+      if (!isUtoopack) {
+        logger.info(chalk.cyan.bold(`Umi v${api.appData.umi.version}`));
+      }
       const enableVite = !!api.config.vite;
 
       // clear tmp
@@ -128,31 +120,48 @@ PORT=8888 umi dev
         isFirstTime: true,
       });
       const { absPagesPath, absSrcPath } = api.paths;
-      const watcherPaths: string[] = await api.applyPlugins({
-        key: 'addTmpGenerateWatcherPaths',
-        initialValue: [
-          absPagesPath,
-          !api.config.routes && api.config.conventionRoutes?.base,
-          join(absSrcPath, 'layouts'),
-          ...expandJSPaths(join(absSrcPath, 'loading')),
-          ...expandJSPaths(join(absSrcPath, 'app')),
-          ...expandJSPaths(join(absSrcPath, 'global')),
-          ...expandCSSPaths(join(absSrcPath, 'global')),
-          ...expandCSSPaths(join(absSrcPath, 'overrides')),
-        ].filter(Boolean),
-      });
-      lodash.uniq<string>(watcherPaths.map(winPath)).forEach((p: string) => {
-        watch({
-          path: p,
-          addToUnWatches: true,
-          onChange: createDebouncedHandler({
+      const watcherPaths: Array<string | ITmpGenerateWatcher> =
+        await api.applyPlugins({
+          key: 'addTmpGenerateWatcherPaths',
+          initialValue: [
+            absPagesPath,
+            !api.config.routes && api.config.conventionRoutes?.base,
+            join(absSrcPath, 'layouts'),
+            ...expandJSPaths(join(absSrcPath, 'loading')),
+            ...expandJSPaths(join(absSrcPath, 'app')),
+            ...expandJSPaths(join(absSrcPath, 'global')),
+            ...expandCSSPaths(join(absSrcPath, 'global')),
+            ...expandCSSPaths(join(absSrcPath, 'overrides')),
+          ].filter(Boolean),
+        });
+      lodash
+        .uniqBy(
+          watcherPaths.map((watcher) => {
+            const normalized =
+              typeof watcher === 'string' ? { path: watcher } : watcher;
+
+            return { ...normalized, path: winPath(normalized.path) };
+          }),
+          ({ events, path }) =>
+            `${path}:${events ? [...events].sort().join(',') : '*'}`,
+        )
+        .forEach(({ events, path: watcherPath }) => {
+          const onChange = createDebouncedHandler({
             timeout: 2000,
             async onChange(opts) {
               await generate({ files: opts.files, isFirstTime: false });
             },
-          }),
+          });
+
+          watch({
+            path: watcherPath,
+            addToUnWatches: true,
+            onChange: createEventFilteredHandler({
+              events,
+              onChange,
+            }),
+          });
         });
-      });
 
       // watch package.json change
       const pkgPath = join(api.cwd, 'package.json');

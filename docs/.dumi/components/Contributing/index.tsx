@@ -14,8 +14,9 @@ export const Contributing = () => {
         <div>
           <a href="https://github.com/umijs/umi/graphs/contributors">
             <img
-              src="https://opencollective.com/umi/contributors.svg?width=1200&button=false"
-              width="1200"
+              src="https://contrib.rocks/image?repo=umijs/umi"
+              width="812"
+              alt="Umi contributors"
             />
           </a>
         </div>

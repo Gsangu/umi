@@ -1,12 +1,13 @@
 {
   "name": "@umijs/bundler-webpack",
-  "version": "4.4.12",
+  "version": "4.7.24",
   "description": "@umijs/bundler-webpack",
   "homepage": "https://github.com/umijs/umi/tree/master/packages/bundler-webpack#readme",
   "bugs": "https://github.com/umijs/umi/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/umijs/umi"
+    "url": "https://github.com/umijs/umi",
+    "directory": "packages/bundler-webpack"
   },
   "license": "MIT",
   "main": "dist/index.js",
@@ -79,13 +80,13 @@
     "terser": "5.16.1",
     "terser-webpack-plugin": "5.3.6",
     "url-loader": "4.1.1",
-    "webpack": "5.88.2",
+    "webpack": "5.110.3",
     "webpack-5-chain": "8.0.2",
     "webpack-bundle-analyzer": "4.7.0",
     "webpack-dev-middleware": "6.0.1",
     "webpack-manifest-plugin": "5.0.0",
     "webpack-sources": "3.2.3",
-    "webpackbar": "5.0.2",
+    "webpackbar": "7.0.0",
     "ws": "8.12.0"
   },
   "publishConfig": {
@@ -185,6 +186,7 @@
       "svgo-loader",
       "url-loader",
       "file-loader",
+      "webpackbar",
       "webpack-bundle-analyzer",
       "webpack-dev-middleware",
       "webpack-manifest-plugin",

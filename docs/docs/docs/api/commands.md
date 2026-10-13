@@ -305,4 +305,3 @@ npx --no-install umi verify-commit $1
 $ umi version
 4.0.0
 ```
-

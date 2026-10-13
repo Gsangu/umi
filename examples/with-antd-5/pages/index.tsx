@@ -11,12 +11,28 @@ import type { ConfigProviderProps } from 'antd/es/config-provider';
 import { useState } from 'react';
 import {
   getLocale,
+  SelectLang,
   setLocale,
   useAntdConfig,
   useAntdConfigSetter,
   useIntl,
 } from 'umi';
+
 const { useToken, darkAlgorithm, defaultAlgorithm, compactAlgorithm } = theme;
+
+const isCI = process.env.CI;
+
+console.log('node env', process.env.NODE_ENV);
+console.log(
+  'equal node env',
+  process.env.NODE_ENV === 'development',
+  testDefine === 'testDefine',
+);
+console.log('object enum', RoutePathEnum.INDEX === '/');
+
+isCI;
+
+console.log('isCI', isCI);
 
 const checkHasAlgorithm = (
   antdConfig: ConfigProviderProps,
@@ -111,6 +127,7 @@ export default function Page() {
           }}
         ></Switch>
       </Space>
+      <SelectLang />
     </div>
   );
 }

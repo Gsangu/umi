@@ -22,11 +22,67 @@ export default (api: IApi) => {
   let tailwind: any = null;
   const outputPath = 'plugin-tailwindcss/tailwind.css';
 
+  api.modifyConfig((memo) => {
+    if (!memo.utoopack || !isTailwindV4({ cwd: api.cwd })) {
+      return memo;
+    }
+
+    const ruleKey = '*.css';
+
+    return {
+      ...memo,
+      utoopack: {
+        ...memo.utoopack,
+        module: {
+          ...memo.utoopack?.module,
+          rules: {
+            [ruleKey]: {
+              condition: {
+                path: /(^|[\\\/])tailwind\.css$/,
+              },
+              loaders: [
+                {
+                  loader: getTailwindWebpackLoaderPath({ cwd: api.cwd }, api),
+                  options: {
+                    base: api.cwd,
+                  },
+                },
+              ],
+              as: '*.css',
+            },
+            ...memo.utoopack?.module?.rules,
+          },
+        },
+      },
+    };
+  });
+
+  api.chainWebpack((memo) => {
+    if (!shouldUseTailwindWebpackLoader(api)) {
+      return;
+    }
+
+    memo.module
+      .rule('tailwindcss')
+      .enforce('pre')
+      .test(/(^|[\\\/])tailwind\.css$/)
+      .use('tailwindcss-loader')
+      .loader(getTailwindWebpackLoaderPath({ cwd: api.cwd }, api))
+      .options({
+        base: api.cwd,
+      });
+  });
+
   api.onBeforeCompiler(() => {
     const inputPath = join(api.cwd, 'tailwind.css');
     const generatedPath = join(api.paths.absTmpPath, outputPath);
-    const binPath = getTailwindBinPath({ cwd: api.cwd });
     const configPath = join(api.cwd, 'tailwind.config.js');
+
+    if (isTailwindV4({ cwd: api.cwd })) {
+      return;
+    }
+
+    const binPath = getTailwindBinPath({ cwd: api.cwd });
 
     if (process.env.IS_UMI_BUILD_WORKER) {
       return;
@@ -43,7 +99,7 @@ export default (api: IApi) => {
           inputPath,
           '-o',
           generatedPath,
-          api.env === 'development' ? '--watch' : '',
+          api.env === 'development' ? '--watch=always' : '',
         ],
         {
           stdio: 'inherit',
@@ -83,10 +139,30 @@ export default (api: IApi) => {
 
   /** 将生成的 css 文件加入到 import 中 */
   api.addEntryImports(() => {
+    if (isTailwindV4({ cwd: api.cwd })) {
+      return [{ source: winPath(join(api.cwd, 'tailwind.css')) }];
+    }
+
     const generatedPath = winPath(join(api.paths.absTmpPath, outputPath));
     return [{ source: generatedPath }];
   });
 };
+
+function isTailwindV4(opts: { cwd: string }) {
+  const pkgPath = require.resolve('tailwindcss/package.json', {
+    paths: [opts.cwd],
+  });
+  const tailwind = require(pkgPath);
+  return tailwind.version.startsWith('4');
+}
+
+function shouldUseTailwindWebpackLoader(api: IApi) {
+  if (!isTailwindV4({ cwd: api.cwd })) {
+    return false;
+  }
+
+  return Boolean(!api.config.utoopack && !api.config.vite && !api.config.mako);
+}
 
 function getTailwindBinPath(opts: { cwd: string }) {
   const pkgPath = require.resolve('tailwindcss/package.json', {
@@ -94,4 +170,26 @@ function getTailwindBinPath(opts: { cwd: string }) {
   });
   const tailwindPath = require(pkgPath).bin['tailwind'];
   return join(dirname(pkgPath), tailwindPath);
+}
+
+function getTailwindWebpackLoaderPath(opts: { cwd: string }, api: IApi) {
+  for (const cwd of [__dirname, opts.cwd]) {
+    const loaderPath = tryResolveTailwindWebpackLoader(cwd);
+    if (loaderPath) return loaderPath;
+  }
+
+  api.logger.error(
+    'tailwindcss v4 with webpack or utoopack requires @tailwindcss/webpack',
+  );
+  process.exit(1);
+}
+
+function tryResolveTailwindWebpackLoader(cwd: string) {
+  try {
+    return require.resolve('@tailwindcss/webpack', {
+      paths: [cwd],
+    });
+  } catch {
+    return null;
+  }
 }

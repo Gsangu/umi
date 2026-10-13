@@ -1,9 +1,8 @@
-import { importLazy, lodash, winPath } from '@umijs/utils';
+import { importLazy, lodash, semver, winPath } from '@umijs/utils';
 import { existsSync, readdirSync } from 'fs';
 import { basename, dirname, join, relative } from 'path';
-import { RUNTIME_TYPE_FILE_NAME } from 'umi';
 import { getMarkupArgs } from '../../commands/dev/getMarkupArgs';
-import { TEMPLATES_DIR } from '../../constants';
+import { RUNTIME_TYPE_FILE_NAME, TEMPLATES_DIR } from '../../constants';
 import { IApi } from '../../types';
 import { getModuleExports } from './getModuleExports';
 import { importsToStr } from './importsToStr';
@@ -46,7 +45,9 @@ export default (api: IApi) => {
     const srcPrefix = api.appData.hasSrcDir ? 'src/' : '';
     const umiTempDir = `${srcPrefix}.${frameworkName}`;
     const baseUrl = api.appData.hasSrcDir ? '../../' : '../';
-    const isTs5 = api.appData.typescript.tsVersion?.startsWith('5');
+    const isGreaterThan5 =
+      api.appData.typescript.tsVersion &&
+      semver.major(api.appData.typescript.tsVersion) >= 5;
     const isTslibInstalled = !!api.appData.typescript.tslibVersion;
 
     // https://github.com/umijs/umi/issues/12545
@@ -66,13 +67,12 @@ export default (api: IApi) => {
         lib: ['dom', 'dom.iterable', 'esnext'],
         allowJs: true,
         skipLibCheck: true,
-        moduleResolution: isTs5 ? 'bundler' : 'node',
+        moduleResolution: isGreaterThan5 ? 'bundler' : 'node',
         importHelpers: isTslibInstalled,
         noEmit: true,
         jsx: api.appData.framework === 'vue' ? 'preserve' : 'react-jsx',
         esModuleInterop: true,
         sourceMap: true,
-        baseUrl,
         strict: true,
         resolveJsonModule: true,
         allowSyntheticDefaultImports: true,
@@ -87,11 +87,11 @@ export default (api: IApi) => {
           : {}),
 
         paths: {
-          '@/*': [`${srcPrefix}*`],
-          '@@/*': [`${umiTempDir}/*`],
+          '@/*': [`${baseUrl}${srcPrefix}*`],
+          '@@/*': [`${baseUrl}${umiTempDir}/*`],
           [`${api.appData.umi.importSource}`]: [relativeUmiDirPath],
           [`${api.appData.umi.importSource}/typings`]: [
-            `${umiTempDir}/typings`,
+            `${baseUrl}${umiTempDir}/typings`,
           ],
           ...(api.config.vite
             ? {
@@ -484,6 +484,7 @@ if (process.env.NODE_ENV === 'development') {
         'outerProvider',
         'render',
         'onRouteChange',
+        'modifyServerLoaderRequest',
       ],
     });
 
@@ -748,7 +749,6 @@ if (process.env.NODE_ENV === 'development') {
       for (const plugin of allPlugins) {
         const file = winPath(join(api.paths.absTmpPath, plugin, 'types.d.ts'));
         if (existsSync(file)) {
-          // 带 .ts 后缀的声明文件 会导致声明失效
           const noSuffixFile = file.replace(/\.ts$/, '');
           beforeExports.push(`export * from '${noSuffixFile}';`);
         }

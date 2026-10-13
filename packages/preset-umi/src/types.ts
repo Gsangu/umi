@@ -4,29 +4,32 @@ import type {
   BuildResult as ESBuildBuildResult,
   Plugin as ESBuildPlugin,
 } from '@umijs/bundler-utils/compiled/esbuild';
-import type { Express, RequestHandler, webpack } from '@umijs/bundler-webpack';
+import type {
+  Express,
+  IConfig,
+  RequestHandler,
+  webpack,
+} from '@umijs/bundler-webpack';
 import type WebpackChain from '@umijs/bundler-webpack/compiled/webpack-5-chain';
 import { createWebSocketServer } from '@umijs/bundler-webpack/dist/server/ws';
-import type { IConfig } from '@umijs/bundler-webpack/dist/types';
 import type {
   IAdd,
+  IRoute as ICoreRoute,
   IEvent,
   IModify,
-  IRoute as ICoreRoute,
   IServicePluginAPI,
   PluginAPI,
 } from '@umijs/core';
 import { Env } from '@umijs/core';
-import type { Declaration } from '@umijs/es-module-parser';
 import type { getMarkup } from '@umijs/server';
 import type { CheerioAPI } from '@umijs/utils/compiled/cheerio';
 import type { InlineConfig as ViteInlineConfig } from 'vite';
 import type { getMarkupArgs } from './commands/dev/getMarkupArgs';
 import type { IOnDemandInstallDep } from './features/depsOnDemand/depsOnDemand';
 import type CodeFrameError from './features/transform/CodeFrameError';
-
+export type { IUtoopackUserConfig } from '@umijs/bundler-utoopack';
 export { UmiApiRequest, UmiApiResponse } from './features/apiRoute';
-export { webpack, IConfig };
+export { IConfig, webpack };
 
 export type IScript =
   | Partial<{
@@ -42,6 +45,7 @@ export type IScript =
 export type IStyle =
   | Partial<{
       content: string;
+      src: string;
       type: string;
     }>
   | string;
@@ -77,6 +81,10 @@ export type IEntryImport = {
 };
 export type IRoute = ICoreRoute;
 export type IFileInfo = Array<{ event: string; path: string }>;
+export interface ITmpGenerateWatcher {
+  path: string;
+  events?: string[];
+}
 export interface IOnGenerateFiles {
   files?: IFileInfo | null;
   isFirstTime?: boolean;
@@ -139,7 +147,7 @@ export type IApi = PluginAPI &
     addPrepareBuildPlugins: IAdd<null, ESBuildPlugin>;
     addRuntimePlugin: IAdd<null, string>;
     addRuntimePluginKey: IAdd<null, string>;
-    addTmpGenerateWatcherPaths: IAdd<null, string>;
+    addTmpGenerateWatcherPaths: IAdd<null, string | ITmpGenerateWatcher>;
     addUIModules: IAdd<null, IUIModule[]>;
     chainWebpack: {
       (fn: {
@@ -248,7 +256,6 @@ export type IApi = PluginAPI &
       origin: Record<string, any>;
     }>;
     onPrepareBuildSuccess: IEvent<{
-      fileImports?: Record<string, Declaration[]>;
       isWatch: boolean;
       result: ESBuildBuildResult;
     }>;

@@ -91,11 +91,9 @@ $ pnpm jest packages/plugin-docs/src/compiler.test.ts
 Umi 的文档由 Umi@4 和 `@umijs/plugin-docs` 插件实现，本质上就是一个 Umi 项目。在根目录执行如下命令即可开始 Umi 文档的开发：
 
 ```bash
-# 安装 Umi 文档依赖
-$ pnpm doc:deps
 # 启用 Umi 文档开发
 # 首次启动时编译耗时较长，请耐心等待
-$ pnpm doc:dev
+$ pnpm docs:dev
 ```
 
 打开指定的端口号，即可实时查看文档更新的内容，以及 `@umijs/plugin-docs` 插件开发的成果。
@@ -144,7 +142,7 @@ $ pnpm format:plugin-docs
 在根目录执行如下命令可以构建 Umi 文档：
 
 ```bash
-$ pnpm doc:build
+$ pnpm s
 ```
 
 ## 新增 package
@@ -176,11 +174,13 @@ $ pnpm build:deps --dep webpack-manifest-plugin
 
 ## 发布
 
-只有 Core Maintainer 才能执行发布。
+只有 Core Maintainer 才能执行发布。Umi 已切换到 npm Trusted Publishing/OIDC，本地发布命令只负责 bump version、生成 release commit/tag 并推送，不再直接执行 `npm publish`。
 
 ```bash
 $ pnpm release
 ```
+
+推送后，GitHub Actions 的 Release workflow 会通过 OIDC 获取 npm 发布权限，执行 `pnpm release:publish`，并带上 `--provenance` 将 package 发布到 npm。
 
 ## 通过 dist-tag 回滚
 

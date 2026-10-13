@@ -1,5 +1,11 @@
 export type { UmiApiRequest, UmiApiResponse } from './features/apiRoute';
-export type { IApi, IConfig, IRoute, webpack } from './types';
+export type {
+  IApi,
+  IConfig,
+  IRoute,
+  IUtoopackUserConfig,
+  webpack,
+} from './types';
 export default () => {
   return {
     plugins: [
@@ -60,9 +66,11 @@ export default () => {
       require.resolve('./features/swc/swc'),
       require.resolve('./features/ui/ui'),
       require.resolve('./features/mako/mako'),
+      require.resolve('./features/reactCompiler/forget'),
+      require.resolve('./features/reactCompiler/reactCompiler'),
+      require.resolve('./features/utoopack/utoopack'),
       require.resolve('./features/hmrGuardian/hmrGuardian'),
       require.resolve('./features/routePreloadOnLoad/routePreloadOnLoad'),
-      require.resolve('./features/forget/forget'),
       require.resolve('./features/bundler/bundler'),
 
       // commands

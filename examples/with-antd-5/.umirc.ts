@@ -1,9 +1,30 @@
+// @ts-ignore make lsp happy
+process.env.CI = true;
+
+export enum RoutePathEnum {
+  INDEX = '/',
+  DETAIL = '/detail',
+}
+
 export default {
   plugins: ['@umijs/plugins/dist/antd', '@umijs/plugins/dist/locale'],
   locale: {
     title: true,
     default: 'zh-CN',
   },
+  define: {
+    'process.env.CI': process.env.CI,
+    testDefine: 'testDefine',
+    RoutePathEnum: RoutePathEnum,
+  },
+  utoopack: {
+    devServer: {
+      dynamicHmrChunkLists: true,
+      lazyDynamicImports: true,
+    },
+  },
+  crossorigin: {},
+  clickToComponent: {},
   antd: {
     // valid for antd5.0 only
     theme: {
